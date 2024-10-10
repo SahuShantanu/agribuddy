@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block style %}
+<style>
+  .typing::after {
+    content: "····";
+    display: inline-block;
+    animation: typing 1s steps(4, end) infinite;
+    font-size: 1.5rem;
+  }
+  @keyframes typing {
+    0%, 100% { content: "·"; }
+    25% { content: "··"; }
+    50% { content: "···"; }
+    75% { content: "····"; }
+  }
+  ::-webkit-scrollbar {
+    width: 1rem;
+  }
+
+/* Track */
+  ::-webkit-scrollbar-track {
+    box-shadow: inset 0 0 4px transparent; 
+    border-radius: 1rem;
+  }
+  
+  /* Handle */
+  ::-webkit-scrollbar-thumb {
+    background: #14532d20; 
+    border-radius: 1rem;
+  }
+
+  /* Handle on hover */
+  ::-webkit-scrollbar-thumb:hover {
+    background: #14532d80; 
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen w-full">
+  {% include 'components/sidebar.html' %}
+  <div class="flex-1 flex flex-col">
+    {% include 'components/chatbox.html' %}
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("#markdown").forEach((element) => {
+    element.innerHTML = marked.parse(element.innerHTML);
+  });
+});
+
+const toggleModal = () => {
+  document.querySelector("#modal").classList.toggle("hidden");
+};
+
+document.querySelector('#query-input').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    sendQuery()
+  }
+})
+
+const sendQuery = async () => {
+  const queryInput = document.getElementById("query-input");
+  const query = queryInput.value.trim();
+  const sendButton = document.getElementById("query-button");
+
+  if (query.length < 20) {
+    alert("Please enter a query. Minimum 20 characters");
+    return;
+  }
+
+  queryInput.disabled = true;
+  sendButton.disabled = true;
+  sendButton.textContent = "Sending...";
+
+  const chatbox = document.getElementById("chatbox");
+  
+  const userMessage = document.createElement("div");
+  userMessage.className = "p-4 rounded-r-2xl w-fit max-w-2/3 rounded-bl-2xl text-lime-100 bg-green-900 border-2 border-green-900 marked self-end";
+  userMessage.textContent = query;
+  chatbox.appendChild(userMessage);
+
+  const typingIndicator = document.createElement("div");
+  typingIndicator.className = "bg-lime-300 p-3 rounded-r-xl w-fit rounded-bl-xl border-2 border-green-900 typing self-start mb-4";
+  typingIndicator.textContent = "";
+  chatbox.appendChild(typingIndicator);
+
+  chatbox.scrollTop = chatbox.scrollHeight;
+
+  try {
+    const response = await fetch("/generate-response", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: query }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      typingIndicator.classList.remove('w-fit')
+      typingIndicator.classList.add('w-2/3')
+      typingIndicator.innerHTML = marked.parse(data.response);
+      typingIndicator.id = "markdown";
+      typingIndicator.classList.remove("typing");
+    } else {
+      alert("Error: " + data.error);
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    alert("Failed to send query");
+    chatbox.removeChild(typingIndicator);
+  } finally {
+    queryInput.disabled = false;
+    sendButton.disabled = false;
+    queryInput.value = "";
+    sendButton.textContent = "Send";
+    chatbox.scrollTop = chatbox.scrollHeight;
+  }
+};
+</script>
+{% endblock %}
